@@ -19,6 +19,10 @@ assert.deepEqual(dashboard.filters.brands,["A","B"],"brand options must survive 
 assert.equal(dashboard.highlights.worstSession.gmv,0,"zero-GMV sessions remain eligible for Worst Session");
 assert.equal(dashboard.highlights.bestHost.name,"Host A","host with at least 4h and 2 sessions is eligible");
 
+const withInactive=analyzeDashboard([...rows,row("Stopped","2026-08-04",500)],current,previous,"All","All");
+assert.equal(withInactive.highlights.noLive.brand,"Stopped","previously active brands without current sessions must be classified as NO LIVE");
+assert.notEqual(withInactive.highlights.biggestDecline?.brand,"Stopped","NO LIVE brands must not be ranked as Biggest Decline");
+
 const shopee=analyzePlatform([{platform:"Shopee",brand:"S",date:"2026-08-10",duration:2,gmv:200,views:100,orders:2,aov:100,viewsToCo:.02}],[],"Shopee");
 assert.equal(shopee.current.err,undefined);
 assert.equal(shopee.current.ctr,undefined);

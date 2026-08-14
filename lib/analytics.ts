@@ -70,37 +70,40 @@ export function analyzeBrand(all:LiveRow[],brand:string,range:DateRange,prev:Dat
 }
 export function analyzeDashboard(all:LiveRow[],range:DateRange,prev:DateRange,platformFilter?:string,brandFilter?:string){
   const currentRange=all.filter(row=>inRange(row.date,range)),previousRange=all.filter(row=>inRange(row.date,prev));
-  const availableBrands=[...new Set(currentRange.filter(row=>row.brand&&(!platformFilter||platformFilter==="All"||row.platform===platformFilter)).map(row=>row.brand))].sort();
+  const filterPlatform=(row:LiveRow)=>row.brand&&(!platformFilter||platformFilter==="All"||row.platform===platformFilter);
+  const availableBrands=[...new Set([...currentRange,...previousRange].filter(filterPlatform).map(row=>row.brand))].sort();
   let current=currentRange,previous=previousRange;
   if(platformFilter&&platformFilter!=="All"){current=current.filter(row=>row.platform===platformFilter);previous=previous.filter(row=>row.platform===platformFilter)}
   if(brandFilter&&brandFilter!=="All"){current=current.filter(row=>row.brand===brandFilter);previous=previous.filter(row=>row.brand===brandFilter)}
   current=current.filter(row=>!!row.brand);previous=previous.filter(row=>!!row.brand);
-  const brands=[...new Set(current.map(row=>row.brand))].sort();
+  const brands=[...new Set([...current,...previous].map(row=>row.brand))].sort();
   const cards=brands.map(brand=>{
     const rows=current.filter(row=>row.brand===brand),baselineRows=previous.filter(row=>row.brand===brand);
-    const platformResults=platforms.map(platform=>analyzePlatform(rows,baselineRows,platform)).filter(item=>item.current.sessions>0);
+    const platformResults=platforms.map(platform=>analyzePlatform(rows,baselineRows,platform)).filter(item=>item.current.sessions>0||item.previous.sessions>0);
     const metrics=aggregate(rows),baseline=aggregate(baselineRows),gmvhDelta=movement(metrics.gmvPerHour,baseline.gmvPerHour),brandConsistency=consistency(rows);
     const warningCount=rows.reduce((total,row)=>total+(row.dataWarnings?.length||0),0),quality=rows.length?Math.max(0,Math.round(100-warningCount/rows.length*20)):0;
+    const activityStatus=metrics.sessions===0&&baseline.sessions>0?"NO_LIVE":metrics.sessions>0?"ACTIVE":"NO_DATA";
     const health=healthFor(platformResults,quality,brandConsistency,gmvhDelta);
-    return{brand,current:metrics,previous:baseline,gmvhDelta,platforms:platformResults,status:health.status,performanceScore:health.score,consistency:brandConsistency,dataQualityScore:quality};
+    return{brand,current:metrics,previous:baseline,gmvhDelta:activityStatus==="ACTIVE"?gmvhDelta:undefined,platforms:platformResults,status:activityStatus==="NO_LIVE"?"NO LIVE":health.status,activityStatus,performanceScore:activityStatus==="NO_LIVE"?0:health.score,consistency:brandConsistency,dataQualityScore:quality};
   }).sort((a,b)=>b.current.gmv-a.current.gmv);
-  const comparable=cards.filter(card=>card.gmvhDelta!=null).sort((a,b)=>(b.gmvhDelta??0)-(a.gmvhDelta??0));
+  const comparable=cards.filter(card=>card.activityStatus==="ACTIVE"&&card.previous.sessions>0&&card.gmvhDelta!=null).sort((a,b)=>(b.gmvhDelta??0)-(a.gmvhDelta??0));
   const positive=comparable.filter(card=>(card.gmvhDelta??0)>0),declining=comparable.filter(card=>(card.gmvhDelta??0)<0),allDeclined=comparable.length>0&&declining.length===comparable.length;
+  const inactive=cards.filter(card=>card.activityStatus==="NO_LIVE").sort((a,b)=>b.previous.gmvPerHour-a.previous.gmvPerHour);
   const sessions=current.filter(validSession).map(row=>({...row,metrics:aggregate([row])})).sort((a,b)=>b.metrics.gmvPerHour-a.metrics.gmvPerHour);
   const hosts=brands.flatMap(brand=>platforms.flatMap(platform=>{
     const baselineRows=current.filter(row=>row.brand===brand&&row.platform===platform),baseline=aggregate(baselineRows);
     return group(baselineRows,row=>row.host,(name,items)=>({...rankedHost(name,items,baseline,platform),brand,platform}))
       .filter(item=>item.name!=="Unknown"&&item.metrics.hours>=4&&item.metrics.sessions>=2);
   })).sort((a,b)=>b.score-a.score);
-  const trafficMedian=median(cards.map(card=>card.current.viewsPerHour)),efficiencyMedian=median(cards.map(card=>card.current.gmvPerHour));
-  const efficiency=cards.map(card=>({...card,quadrant:card.current.viewsPerHour>=trafficMedian?(card.current.gmvPerHour>=efficiencyMedian?"HIGH TRAFFIC / HIGH EFFICIENCY":"HIGH TRAFFIC / LOW EFFICIENCY"):(card.current.gmvPerHour>=efficiencyMedian?"LOW TRAFFIC / HIGH EFFICIENCY":"LOW TRAFFIC / LOW EFFICIENCY"),benchmarks:{trafficMedian,efficiencyMedian}}));
-  const priority=[...cards].sort((a,b)=>{const rank=(item:any)=>item.status==="CRITICAL"?0:item.status==="WATCH"?1:2;return rank(a)-rank(b)||((a.gmvhDelta??0)-(b.gmvhDelta??0))}).slice(0,10);
+  const activeCards=cards.filter(card=>card.activityStatus==="ACTIVE"),trafficMedian=median(activeCards.map(card=>card.current.viewsPerHour)),efficiencyMedian=median(activeCards.map(card=>card.current.gmvPerHour));
+  const efficiency=activeCards.map(card=>({...card,quadrant:card.current.viewsPerHour>=trafficMedian?(card.current.gmvPerHour>=efficiencyMedian?"HIGH TRAFFIC / HIGH EFFICIENCY":"HIGH TRAFFIC / LOW EFFICIENCY"):(card.current.gmvPerHour>=efficiencyMedian?"LOW TRAFFIC / HIGH EFFICIENCY":"LOW TRAFFIC / LOW EFFICIENCY"),benchmarks:{trafficMedian,efficiencyMedian}}));
+  const priority=[...cards].sort((a,b)=>{const rank=(item:any)=>item.activityStatus==="NO_LIVE"?-1:item.status==="CRITICAL"?0:item.status==="WATCH"?1:2;return rank(a)-rank(b)||((a.gmvhDelta??0)-(b.gmvhDelta??0))}).slice(0,10);
   const orphanWarnings=all.filter(row=>(!row.date||!row.brand)&&(!platformFilter||platformFilter==="All"||row.platform===platformFilter)&&(!brandFilter||brandFilter==="All"||row.brand===brandFilter)).flatMap(row=>row.dataWarnings||[]);
   const warnings:DataWarning[]=[...current.flatMap(row=>row.dataWarnings||[]),...orphanWarnings];
   return{
     filters:{brands:availableBrands,platforms},
     summary:{current:aggregate(current),previous:aggregate(previous),gmvhDelta:movement(aggregate(current).gmvPerHour,aggregate(previous).gmvPerHour),dataWarnings:warnings.length},
     brands:cards,efficiency,priority,warnings,
-    highlights:{bestSession:sessions[0]||null,worstSession:sessions.length?sessions[sessions.length-1]:null,bestHost:hosts[0]||null,worstHost:hosts.length?hosts[hosts.length-1]:null,topGrowth:positive[0]||null,smallestDecline:allDeclined?declining[0]:null,biggestDecline:declining.length?declining[declining.length-1]:null}
+    highlights:{bestSession:sessions[0]||null,worstSession:sessions.length?sessions[sessions.length-1]:null,bestHost:hosts[0]||null,worstHost:hosts.length?hosts[hosts.length-1]:null,topGrowth:positive[0]||null,smallestDecline:allDeclined?declining[0]:null,biggestDecline:declining.length?declining[declining.length-1]:null,noLive:inactive[0]||null,noLiveCount:inactive.length}
   };
 }
