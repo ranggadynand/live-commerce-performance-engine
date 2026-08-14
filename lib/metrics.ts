@@ -1,5 +1,5 @@
 import {LiveRow,Metrics} from "./types";
-const sum=(xs:(number|undefined)[])=>xs.reduce((a,b)=>a+(Number.isFinite(b as number)?(b as number):0),0);
+const sum=(xs:(number|undefined)[]):number=>xs.reduce<number>((a,b)=>a+(Number.isFinite(b as number)?(b as number):0),0);
 function weighted(rows:LiveRow[],key:keyof LiveRow,weight:keyof LiveRow){
   let n=0,d=0;
   for(const r of rows){
