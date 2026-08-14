@@ -2,6 +2,22 @@ export type Platform="TikTok"|"Shopee";
 export type Health="HEALTHY"|"WATCH"|"CRITICAL"|"N/A";
 export type ResultStatus="ABOVE"|"ON TRACK"|"BELOW"|"N/A";
 
+export type DataWarning={
+  brand:string;
+  platform:Platform;
+  date?:string;
+  session?:string;
+  host?:string;
+  sourceSheet:string;
+  sourceRow:number;
+  sourceId?:string;
+  field:string;
+  rawValue:unknown;
+  type:"MISSING"|"INVALID";
+  explanation:string;
+  recommendedFix:string;
+};
+
 export type LiveRow={
   platform:Platform;
   brand:string;
@@ -34,7 +50,9 @@ export type LiveRow={
   errTarget?:number;
   ctrTarget?:number;
   coRateTarget?:number;
-  dataWarnings?:string[];
+  sourceSheet?:string;
+  sourceRow?:number;
+  dataWarnings?:DataWarning[];
 };
 
 export type Metrics={
@@ -62,6 +80,8 @@ export type Diagnostic={
   primaryDriver:string;
   summary:string;
   actions:string[];
+  owner:string;
+  confidence:"HIGH"|"MEDIUM"|"LOW";
 };
 
 export type PeriodKey="today"|"yesterday"|"last7"|"last30"|"thisWeek"|"lastWeek"|"thisMonth"|"lastMonth"|"custom";

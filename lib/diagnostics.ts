@@ -4,7 +4,7 @@ import {movement} from "./metrics";
 type D={name:string;value?:number;action:string};
 
 function resultStatus(c:Metrics,b:Metrics):ResultStatus{
-  if(!b.gmvPerHour)return"N/A";
+  if(b.sessions===0||b.hours===0)return"N/A";
   const m=movement(c.gmvPerHour,b.gmvPerHour);
   if(m==null)return"N/A";
   if(m>=.10)return"ABOVE";
@@ -36,5 +36,8 @@ export function diagnose(c:Metrics,b:Metrics,p:Platform):Diagnostic{
   const summary=`Result ${rs}; GMV/H ${movement(c.gmvPerHour,b.gmvPerHour)==null?"N/A":`${(movement(c.gmvPerHour,b.gmvPerHour)!*100).toFixed(1)}%`} vs previous equivalent period. `+
     (primary==="No dominant funnel break"?"Funnel is relatively stable.":`Largest negative signal: ${primary} ${((worst?.value??0)*100).toFixed(1)}%.`);
   const actions=primary==="No dominant funnel break"||!worst?["Maintain execution and inspect session-level outliers."]:[worst.action];
-  return{resultStatus:rs,funnelHealth:health,primaryDriver:primary,summary,actions}
+  const observed=clean.length;
+  const confidence:"HIGH"|"MEDIUM"|"LOW"=c.sessions>=8&&b.sessions>=8&&observed>=3?"HIGH":c.sessions>=2&&b.sessions>=2&&observed>=2?"MEDIUM":"LOW";
+  const owner=health==="CRITICAL"?"AE + Live Manager":"AE";
+  return{resultStatus:rs,funnelHealth:health,primaryDriver:primary,summary,actions,owner,confidence}
 }

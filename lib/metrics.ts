@@ -6,7 +6,7 @@ function weighted(rows:LiveRow[],key:keyof LiveRow,weight:keyof LiveRow){
     const v=Number(r[key]),w=Number(r[weight]);
     if(Number.isFinite(v)&&Number.isFinite(w)&&w>0){n+=v*w;d+=w}
   }
-  return d?n/d:undefined
+  return d>0?n/d:undefined
 }
 export function aggregate(rows:LiveRow[]):Metrics{
   const p=rows[0]?.platform,h=sum(rows.map(r=>r.duration)),gmv=sum(rows.map(r=>r.gmv)),views=sum(rows.map(r=>r.views));
@@ -20,7 +20,7 @@ export function aggregate(rows:LiveRow[]):Metrics{
   }
   aov=orders?gmv/orders:weighted(rows,"aov","gmv");
   return{
-    sessions:rows.length,hours:h,gmv,gmvPerHour:h?gmv/h:0,views,viewsPerHour:h?views/h:0,
+    sessions:rows.length,hours:h,gmv,gmvPerHour:h>0?gmv/h:0,views,viewsPerHour:h>0?views/h:0,
     impressions:p==="TikTok"?imp:undefined,
     err:p==="TikTok"?(imp?views/imp:weighted(rows,"err","views")):undefined,
     avd:weighted(rows,"avd","views"),
