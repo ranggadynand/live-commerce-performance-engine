@@ -107,3 +107,38 @@ export function analyzeDashboard(all:LiveRow[],range:DateRange,prev:DateRange,pl
     highlights:{bestSession:sessions[0]||null,worstSession:sessions.length?sessions[sessions.length-1]:null,bestHost:hosts[0]||null,worstHost:hosts.length?hosts[hosts.length-1]:null,topGrowth:positive[0]||null,smallestDecline:allDeclined?declining[0]:null,biggestDecline:declining.length?declining[declining.length-1]:null,noLive:inactive[0]||null,noLiveCount:inactive.length}
   };
 }
+
+export function analyzeComparison(all:LiveRow[],left:{brand:string;range:DateRange},right:{brand:string;range:DateRange},platformFilter?:string){
+  const select=(side:{brand:string;range:DateRange})=>all.filter(row=>row.brand===side.brand&&inRange(row.date,side.range)&&(!platformFilter||platformFilter==="All"||row.platform===platformFilter));
+  const leftRows=select(left),rightRows=select(right),leftMetrics=aggregate(leftRows),rightMetrics=aggregate(rightRows);
+  const metricKeys:(keyof Metrics)[]=["gmv","gmvPerHour","hours","sessions","views","viewsPerHour","err","ctr","coRate","viewsToCo","aov","watchGpm"];
+  const metrics=metricKeys.map(key=>{const a=leftMetrics[key] as number|undefined,b=rightMetrics[key] as number|undefined;return{key,left:a,right:b,gap:a!=null&&b!=null?a-b:undefined,gapPercent:a!=null&&b!=null&&b!==0?(a-b)/b:undefined,winner:a==null||b==null||a===b?"TIE":a>b?"LEFT":"RIGHT"}});
+  return{left:{...left,metrics:leftMetrics,platforms:platforms.map(platform=>({platform,metrics:aggregate(leftRows.filter(row=>row.platform===platform))})).filter(item=>item.metrics.sessions>0)},right:{...right,metrics:rightMetrics,platforms:platforms.map(platform=>({platform,metrics:aggregate(rightRows.filter(row=>row.platform===platform))})).filter(item=>item.metrics.sessions>0)},metrics};
+}
+
+export function analyzeHostReport(all:LiveRow[],range:DateRange,platformFilter?:string,brandFilter?:string){
+  let rows=all.filter(row=>inRange(row.date,range)&&row.host);
+  if(platformFilter&&platformFilter!=="All")rows=rows.filter(row=>row.platform===platformFilter);
+  if(brandFilter&&brandFilter!=="All")rows=rows.filter(row=>row.brand===brandFilter);
+  const assignments=[...new Set(rows.map(row=>`${row.brand}\u0000${row.platform}`))].flatMap(key=>{
+    const[brand,platform]=key.split("\u0000") as [string,Platform],baseRows=rows.filter(row=>row.brand===brand&&row.platform===platform),baseline=aggregate(baseRows);
+    return group(baseRows,row=>row.host,(name,items)=>({...rankedHost(name,items,baseline,platform),brand,platform,rows:items}));
+  });
+  const eligible=assignments.filter(item=>item.name!=="Unknown"&&item.metrics.hours>=4&&item.metrics.sessions>=2);
+  const hostNames=[...new Set(assignments.map(item=>item.name).filter(name=>name!=="Unknown"))];
+  const ranking=hostNames.map(name=>{
+    const hostAssignments=eligible.filter(item=>item.name===name),hostRows=rows.filter(row=>row.host===name),metrics=aggregate(hostRows),totalHours=hostAssignments.reduce((sum,item)=>sum+item.metrics.hours,0);
+    const score=totalHours?Math.round(hostAssignments.reduce((sum,item)=>sum+item.score*item.metrics.hours,0)/totalHours):0;
+    const stable=totalHours?Math.round(hostAssignments.reduce((sum,item)=>sum+item.consistency*item.metrics.hours,0)/totalHours):consistency(hostRows);
+    return{name,score,consistency:stable,metrics,eligible:hostAssignments.length>0,assignments:hostAssignments.map(({rows:_,...item})=>item),status:hostAssignments.length===0?"INSUFFICIENT SAMPLE":score>=110?"TOP PERFORMER":score>=90?"STRONG":"WATCH"};
+  }).sort((a,b)=>Number(b.eligible)-Number(a.eligible)||b.score-a.score);
+  const championMetrics:{key:keyof Metrics;label:string;platform?:Platform}[]=[
+    {key:"gmvPerHour",label:"GMV/H"},{key:"viewsPerHour",label:"Views/H"},{key:"aov",label:"AOV"},{key:"watchGpm",label:"Watch GPM"},
+    {key:"err",label:"ERR",platform:"TikTok"},{key:"ctr",label:"CTR",platform:"TikTok"},{key:"coRate",label:"CO Rate",platform:"TikTok"},{key:"viewsToCo",label:"Views-to-CO",platform:"Shopee"}
+  ];
+  const champions=championMetrics.map(metric=>{
+    const pool=eligible.filter(item=>!metric.platform||item.platform===metric.platform).filter(item=>item.metrics[metric.key]!=null).sort((a,b)=>(b.metrics[metric.key] as number)-(a.metrics[metric.key] as number));
+    const winner=pool[0];return{...metric,host:winner?.name||null,brand:winner?.brand||null,value:winner?.metrics[metric.key],platform:metric.platform||winner?.platform};
+  });
+  return{range,ranking,champions,bestOverall:ranking.find(item=>item.eligible)||null,eligibility:{minimumHours:4,minimumSessions:2},brands:[...new Set(rows.map(row=>row.brand))].sort()};
+}

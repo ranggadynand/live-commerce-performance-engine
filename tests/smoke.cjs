@@ -4,7 +4,7 @@ require.extensions[".ts"]=(module,filename)=>{
   const source=require("node:fs").readFileSync(filename,"utf8");
   module._compile(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,esModuleInterop:true}}).outputText,filename);
 };
-const {analyzeDashboard,analyzePlatform}=require("../lib/analytics.ts");
+const {analyzeComparison,analyzeDashboard,analyzeHostReport,analyzePlatform}=require("../lib/analytics.ts");
 const {parseRows}=require("../lib/sheets.ts");
 const {weeklyWindows}=require("../lib/email.ts");
 
@@ -22,6 +22,14 @@ assert.equal(dashboard.highlights.bestHost.name,"Host A","host with at least 4h 
 const withInactive=analyzeDashboard([...rows,row("Stopped","2026-08-04",500)],current,previous,"All","All");
 assert.equal(withInactive.highlights.noLive.brand,"Stopped","previously active brands without current sessions must be classified as NO LIVE");
 assert.notEqual(withInactive.highlights.biggestDecline?.brand,"Stopped","NO LIVE brands must not be ranked as Biggest Decline");
+
+const comparison=analyzeComparison(rows,{brand:"A",range:previous},{brand:"A",range:current},"All");
+assert.equal(comparison.left.brand,"A");
+assert(comparison.metrics.some(metric=>metric.key==="gmvPerHour"&&metric.winner==="LEFT"),"same-brand period comparison must identify metric winners");
+
+const hostReport=analyzeHostReport(rows,current,"TikTok","A");
+assert.equal(hostReport.bestOverall.name,"Host A");
+assert(hostReport.champions.some(champion=>champion.key==="gmvPerHour"&&champion.host==="Host A"));
 
 const shopee=analyzePlatform([{platform:"Shopee",brand:"S",date:"2026-08-10",duration:2,gmv:200,views:100,orders:2,aov:100,viewsToCo:.02}],[],"Shopee");
 assert.equal(shopee.current.err,undefined);
