@@ -84,5 +84,5 @@ export type Diagnostic={
   confidence:"HIGH"|"MEDIUM"|"LOW";
 };
 
-export type PeriodKey="today"|"yesterday"|"last7"|"last30"|"thisWeek"|"lastWeek"|"thisMonth"|"lastMonth"|"custom";
+export type PeriodKey="today"|"yesterday"|"last7"|"last30"|"thisWeek"|"lastWeek"|"thisMonth"|"lastMonth"|"allTime"|"custom";
 export type DateRange={start:string;end:string};
