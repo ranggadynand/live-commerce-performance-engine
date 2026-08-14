@@ -1,18 +1,18 @@
 import { Diagnostic, Metrics } from "./types";
 import { pct } from "./metrics";
 
-type Move={name:string; value?:number; direction:"up"|"down"; action:string};
+type Move={name:string; value?:number; action:string};
 
 export function diagnose(current:Metrics, baseline:Metrics):Diagnostic {
   const gmvh=pct(current.gmvPerHour,baseline.gmvPerHour) ?? 0;
   const moves:Move[]=[
-    {name:"Traffic / Entry",value:pct(current.err,baseline.err),direction:"down",action:"Review opening execution, traffic source, account health and entry-room appeal."},
-    {name:"Retention",value:pct(current.avd,baseline.avd),direction:"down",action:"Review host pacing, PK/use-case loop, demo frequency and dead air."},
-    {name:"Engagement",value:pct(current.engagementRate,baseline.engagementRate),direction:"down",action:"Add interaction triggers, questions, comment hooks and clearer participation mechanics."},
-    {name:"Product Click Intent",value:pct(current.ctr,baseline.ctr),direction:"down",action:"Review pinned SKU, product bridging, demo, offer clarity and CTA reason-to-click."},
-    {name:"Conversion",value:pct(current.coRate,baseline.coRate),direction:"down",action:"Check promo competitiveness, stock, voucher, PDP, trust objections and closing."},
-    {name:"Basket Size",value:pct(current.aov,baseline.aov),direction:"down",action:"Push bundles, quantity ladders, upsell and cross-sell."},
-    {name:"Viewer Monetization",value:pct(current.watchGpm,baseline.watchGpm),direction:"down",action:"Audit the full viewer-to-order chain; traffic exists but monetization per 1K viewers weakened."},
+    {name:"Traffic / Entry",value:pct(current.err,baseline.err),action:"Review opening execution, traffic source, account health and entry-room appeal."},
+    {name:"Retention",value:pct(current.avd,baseline.avd),action:"Review host pacing, PK/use-case loop, demo frequency and dead air."},
+    {name:"Engagement",value:pct(current.engagementRate,baseline.engagementRate),action:"Add interaction triggers, questions, comment hooks and clearer participation mechanics."},
+    {name:"Product Click Intent",value:pct(current.ctr,baseline.ctr),action:"Review pinned SKU, product bridging, demo, offer clarity and CTA reason-to-click."},
+    {name:"Conversion",value:pct(current.coRate,baseline.coRate),action:"Check promo competitiveness, stock, voucher, PDP, trust objections and closing."},
+    {name:"Basket Size",value:pct(current.aov,baseline.aov),action:"Push bundles, quantity ladders, upsell and cross-sell."},
+    {name:"Viewer Monetization",value:pct(current.watchGpm,baseline.watchGpm),action:"Audit the full viewer-to-order chain; traffic exists but monetization per 1K viewers weakened."},
   ].filter(x=>x.value!=null);
 
   const worst=[...moves].sort((a,b)=>(a.value??0)-(b.value??0))[0];
