@@ -9,6 +9,7 @@ function wibParts(now=new Date()){
 }
 function make(y:number,m:number,d:number){return new Date(Date.UTC(y,m,d));}
 const iso=(d:Date)=>`${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+const operationalDate=(date:Date|null)=>date&&!Number.isNaN(date.getTime())&&date.getUTCFullYear()>=2020&&date.getUTCFullYear()<=2100?date:null;
 
 export function todayWib(now=new Date()){const p=wibParts(now);return make(p.y,p.m,p.day)}
 export function parseDataDate(value?:string){
@@ -18,12 +19,12 @@ export function parseDataDate(value?:string){
   const serial=Number(s);
   if(Number.isFinite(serial)&&serial>20000&&serial<80000){
     const d=new Date((serial-25569)*86400000);
-    return Number.isNaN(d.getTime())?null:d;
+    return operationalDate(d);
   }
   const direct=new Date(s);
-  if(!Number.isNaN(direct.getTime()))return make(direct.getUTCFullYear(),direct.getUTCMonth(),direct.getUTCDate());
+  if(!Number.isNaN(direct.getTime()))return operationalDate(make(direct.getUTCFullYear(),direct.getUTCMonth(),direct.getUTCDate()));
   const m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if(m)return make(+m[3],+m[2]-1,+m[1]);
+  if(m)return operationalDate(make(+m[3],+m[2]-1,+m[1]));
   return null;
 }
 export const normalizeDate=(v?:string)=>{const d=parseDataDate(v);return d?iso(d):undefined};
