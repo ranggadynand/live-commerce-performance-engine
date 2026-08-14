@@ -22,6 +22,9 @@ export function aggregate(rows:LiveRow[]):Metrics{
   return{
     sessions:rows.length,hours:h,gmv,gmvPerHour:h>0?gmv/h:0,views,viewsPerHour:h>0?views/h:0,
     impressions:p==="TikTok"?imp:undefined,
+    productImpressions:p==="TikTok"?pi:undefined,
+    productClicks:clicks,
+    orders,
     err:p==="TikTok"?(imp?views/imp:weighted(rows,"err","views")):undefined,
     avd:weighted(rows,"avd","views"),
     engagementRate:p==="TikTok"?weighted(rows,"engagementRate","views"):undefined,

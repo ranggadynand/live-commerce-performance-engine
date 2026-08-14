@@ -12,8 +12,33 @@ const group=<T,>(rows:LiveRow[],key:(r:LiveRow)=>string|undefined,make:(name:str
 const ratio=(value?:number,baseline?:number)=>value==null||baseline==null||baseline<=0?undefined:Math.max(0,Math.min(2,value/baseline));
 const median=(values:number[])=>{const sorted=[...values].sort((a,b)=>a-b);if(!sorted.length)return 0;const middle=Math.floor(sorted.length/2);return sorted.length%2?sorted[middle]:(sorted[middle-1]+sorted[middle])/2};
 const isoDate=(date:Date)=>date.toISOString().slice(0,10);
-const shiftDays=(value:string,days:number)=>{const date=new Date(value+"T00:00:00Z");date.setUTCDate(date.getUTCDate()+days);return isoDate(date)};
 const calendarMonth=(value:string,offset:number)=>{const date=new Date(value+"T00:00:00Z"),start=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+offset,1)),end=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+offset+1,0));return{start:isoDate(start),end:isoDate(end)}};
+const average=(values:(number|undefined)[])=>{const valid=values.filter((value):value is number=>Number.isFinite(value));return valid.length?valid.reduce((total,value)=>total+value,0)/valid.length:undefined};
+const total=(rows:LiveRow[],key:keyof LiveRow)=>rows.reduce((sum,row)=>sum+(Number.isFinite(row[key] as number)?Number(row[key]):0),0);
+const metricConfigs={
+  All:[{key:"views",label:"Views",format:"number",target:"viewsTarget"},{key:"conversion",label:"Conversion",format:"percent"},{key:"aov",label:"AOV",format:"money",target:"aovTarget"},{key:"gmv",label:"GMV",format:"money",target:"gmvTarget"}],
+  Shopee:[{key:"views",label:"Views",format:"number",target:"viewsTarget"},{key:"viewsToCo",label:"Views to Order",format:"percent",target:"viewsToCoTarget"},{key:"orders",label:"Orders",format:"number"},{key:"aov",label:"AOV",format:"money",target:"aovTarget"},{key:"gmv",label:"GMV",format:"money",target:"gmvTarget"}],
+  TikTok:[{key:"impressions",label:"Impressions",format:"number"},{key:"err",label:"ERR",format:"percent",target:"errTarget"},{key:"views",label:"Views",format:"number",target:"viewsTarget"},{key:"productImpressions",label:"Product Impressions",format:"number"},{key:"ctr",label:"CTR",format:"percent",target:"ctrTarget"},{key:"productClicks",label:"Product Clicks",format:"number"},{key:"coRate",label:"Conversion",format:"percent",target:"coRateTarget"},{key:"orders",label:"Orders",format:"number"},{key:"aov",label:"AOV",format:"money",target:"aovTarget"},{key:"gmv",label:"GMV",format:"money",target:"gmvTarget"}]
+} as const;
+function summaryValue(rows:LiveRow[],platform:string,key:string){
+  if(!rows.length)return undefined;
+  const sessions=rows.length,gmv=total(rows,"gmv"),views=total(rows,"views"),orders=total(rows,"orders");
+  if(key==="gmv")return gmv/sessions;
+  if(key==="views")return views/sessions;
+  if(key==="orders")return orders/sessions;
+  if(key==="conversion")return views?orders/views:undefined;
+  const metrics=aggregate(platform==="All"?rows:rows.filter(row=>row.platform===platform));
+  if(["impressions","productImpressions","productClicks"].includes(key)){const value=metrics[key as keyof Metrics] as number|undefined;return value==null?undefined:value/sessions}
+  return metrics[key as keyof Metrics] as number|undefined;
+}
+function buildSummaryMetrics(current:LiveRow[],previous:LiveRow[],lastMonth:LiveRow[],platform:string){
+  const config=metricConfigs[platform as keyof typeof metricConfigs]||metricConfigs.All;
+  return config.map(metric=>{
+    const value=summaryValue(current,platform,metric.key),previousAverage=summaryValue(previous,platform,metric.key),lastMonthAverage=summaryValue(lastMonth,platform,metric.key);
+    const target="target" in metric?average(current.map(row=>row[metric.target as keyof LiveRow] as number|undefined)):undefined;
+    return{...metric,value,previousAverage,lastMonthAverage,target,deltaPrevious:movement(value,previousAverage),deltaLastMonth:movement(value,lastMonthAverage),deltaTarget:movement(value,target)};
+  });
+}
 
 function weightedScore(parts:{v?:number;w:number}[]){
   const valid=parts.filter(part=>part.v!=null),weight=valid.reduce((total,part)=>total+part.w,0);
@@ -105,16 +130,14 @@ export function analyzeDashboard(all:LiveRow[],range:DateRange,prev:DateRange,pl
   const priority=[...cards].sort((a,b)=>{const rank=(item:any)=>item.activityStatus==="NO_LIVE"?-1:item.status==="CRITICAL"?0:item.status==="WATCH"?1:2;return rank(a)-rank(b)||((a.gmvhDelta??0)-(b.gmvhDelta??0))}).slice(0,10);
   const orphanWarnings=all.filter(row=>(!row.date||!row.brand)&&(!platformFilter||platformFilter==="All"||row.platform===platformFilter)&&(!brandFilter||brandFilter==="All"||row.brand===brandFilter)).flatMap(row=>row.dataWarnings||[]);
   const warnings:DataWarning[]=[...current.flatMap(row=>row.dataWarnings||[]),...orphanWarnings];
-  let executiveRows=all.filter(row=>row.brand&&row.date&&(!platformFilter||platformFilter==="All"||row.platform===platformFilter)&&(!brandFilter||brandFilter==="All"||row.brand===brandFilter));
-  const lastWeek={start:shiftDays(range.end,-6),end:range.end},previousWeek={start:shiftDays(range.end,-13),end:shiftDays(range.end,-7)},lastMonth=calendarMonth(range.end,-1),previousMonth=calendarMonth(range.end,-2);
-  const periodMetrics=(window:DateRange)=>aggregate(executiveRows.filter(row=>inRange(row.date,window))),weekMetrics=periodMetrics(lastWeek),previousWeekMetrics=periodMetrics(previousWeek),monthMetrics=periodMetrics(lastMonth),previousMonthMetrics=periodMetrics(previousMonth);
-  const endDate=new Date(range.end+"T00:00:00Z"),year=endDate.getUTCFullYear(),ytdRange={start:`${year}-01-01`,end:range.end},ytd=periodMetrics(ytdRange),daysElapsed=Math.max(1,Math.round((endDate.getTime()-Date.UTC(year,0,1))/86400000)+1),daysInYear=(Date.UTC(year+1,0,1)-Date.UTC(year,0,1))/86400000;
-  const monthlyTrend=Array.from({length:12},(_,index)=>{const month=String(index+1).padStart(2,"0"),window={start:`${year}-${month}-01`,end:isoDate(new Date(Date.UTC(year,index+1,0)))},metrics=periodMetrics(window);return{month:`${year}-${month}`,gmv:metrics.gmv,gmvPerHour:metrics.gmvPerHour,sessions:metrics.sessions}}).filter(item=>item.month<=range.end.slice(0,7));
+  const summarySource=all.filter(row=>row.brand&&row.date&&(!platformFilter||platformFilter==="All"||row.platform===platformFilter)&&(!brandFilter||brandFilter==="All"||row.brand===brandFilter));
+  const lastMonth=calendarMonth(range.end,-1),lastMonthRows=summarySource.filter(row=>inRange(row.date,lastMonth));
+  const summaryMetrics=buildSummaryMetrics(current,previous,lastMonthRows,platformFilter||"All");
   return{
     filters:{brands:availableBrands,platforms},
     summary:{current:aggregate(current),previous:aggregate(previous),gmvhDelta:movement(aggregate(current).gmvPerHour,aggregate(previous).gmvPerHour),dataWarnings:warnings.length},
     brands:cards,efficiency,priority,warnings,
-    executive:{lastWeek:{range:lastWeek,metrics:weekMetrics,gmvhDelta:movement(weekMetrics.gmvPerHour,previousWeekMetrics.gmvPerHour)},lastMonth:{range:lastMonth,metrics:monthMetrics,gmvhDelta:movement(monthMetrics.gmvPerHour,previousMonthMetrics.gmvPerHour)},ytd:{range:ytdRange,metrics:ytd,runRateGmv:ytd.gmv/daysElapsed*daysInYear},monthlyTrend},
+    summaryMetrics:{platform:platformFilter||"All",basis:"Average per live session",lastMonthRange:lastMonth,cards:summaryMetrics},
     highlights:{bestSession:sessions[0]||null,worstSession:sessions.length?sessions[sessions.length-1]:null,bestHost:hosts[0]||null,worstHost:hosts.length?hosts[hosts.length-1]:null,topGrowth:positive[0]||null,smallestDecline:allDeclined?declining[0]:null,biggestDecline:declining.length?declining[declining.length-1]:null,noLive:inactive[0]||null,noLiveCount:inactive.length}
   };
 }

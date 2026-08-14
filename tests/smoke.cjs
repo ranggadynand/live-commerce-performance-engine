@@ -28,7 +28,10 @@ const historical=analyzeDashboard(lifecycleWithLaterDataset,{start:"2026-08-01",
 assert.equal(historical.brands.find(brand=>brand.brand==="Stopped").lifecycleStatus,"DORMANT");
 assert.equal(historical.brands.find(brand=>brand.brand==="Fonterra").lifecycleStatus,"STILL ACTIVE","a brand scheduled through the current date must not become dormant because another brand has later data");
 assert.equal(historical.brands.find(brand=>brand.brand==="A").activeFrom,"2026-08-04");
-assert(historical.executive.ytd.runRateGmv>0,"executive summary must expose a yearly run-rate");
+assert.deepEqual(historical.summaryMetrics.cards.map(card=>card.key),["views","conversion","aov","gmv"],"All summary must expose universal funnel-to-result metrics");
+const tiktokSummary=analyzeDashboard(rows,current,previous,"TikTok","All","2026-08-15");
+assert(tiktokSummary.summaryMetrics.cards.some(card=>card.key==="impressions"),"TikTok summary must start from impressions");
+assert(tiktokSummary.summaryMetrics.cards.some(card=>card.key==="gmv"),"TikTok summary must end at GMV");
 
 const comparison=analyzeComparison(rows,{brand:"A",range:previous},{brand:"A",range:current},"All");
 assert.equal(comparison.left.brand,"A");
