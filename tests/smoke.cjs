@@ -7,6 +7,7 @@ require.extensions[".ts"]=(module,filename)=>{
 const {analyzeComparison,analyzeDashboard,analyzeHostReport,analyzePlatform}=require("../lib/analytics.ts");
 const {parseRows}=require("../lib/sheets.ts");
 const {weeklyWindows}=require("../lib/email.ts");
+const {normalizeDate}=require("../lib/dates.ts");
 
 const current={start:"2026-08-10",end:"2026-08-16"},previous={start:"2026-08-03",end:"2026-08-09"};
 const row=(brand,date,gmv,extra={})=>({platform:"TikTok",brand,date,duration:2,gmv,views:100,impressions:1000,productImpressions:100,productClicks:10,orders:1,host:"Host A",...extra});
@@ -46,4 +47,5 @@ assert(parsed[0].dataWarnings.some(w=>w.field==="gmv"&&w.type==="INVALID"));
 assert(!parsed[0].dataWarnings.some(w=>w.field==="err"),"Shopee must not warn on TikTok-only metrics");
 
 assert.deepEqual(weeklyWindows(new Date("2026-08-17T10:00:00Z")).current,{start:"2026-08-10",end:"2026-08-16"});
+assert.equal(normalizeDate("136456-01-01"),undefined,"out-of-range spreadsheet dates must not corrupt All Time or lifecycle ranges");
 console.log("Smoke checks passed");
