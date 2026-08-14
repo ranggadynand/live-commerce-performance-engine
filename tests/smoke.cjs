@@ -21,10 +21,12 @@ assert.equal(dashboard.highlights.worstSession.gmv,0,"zero-GMV sessions remain e
 assert.equal(dashboard.highlights.bestHost.name,"Host A","host with at least 4h and 2 sessions is eligible");
 
 const lifecycleRows=[...rows,row("Stopped","2026-08-04",500),row("Future Active","2026-09-02",700)];
-const withInactive=analyzeDashboard(lifecycleRows,current,previous,"All","All");
+const withInactive=analyzeDashboard(lifecycleRows,current,previous,"All","All","2026-08-15");
 assert(!withInactive.brands.some(brand=>brand.brand==="Stopped"),"brands without activity in the selected period must not enter summary calculations");
-const historical=analyzeDashboard(lifecycleRows,{start:"2026-08-01",end:"2026-08-31"},{start:"2026-07-01",end:"2026-07-31"},"All","All");
+const lifecycleWithLaterDataset=[...lifecycleRows,row("Fonterra","2026-08-10",900),row("Fonterra","2026-08-31",900),row("Another Brand","2026-12-30",100)];
+const historical=analyzeDashboard(lifecycleWithLaterDataset,{start:"2026-08-01",end:"2026-08-31"},{start:"2026-07-01",end:"2026-07-31"},"All","All","2026-08-15");
 assert.equal(historical.brands.find(brand=>brand.brand==="Stopped").lifecycleStatus,"DORMANT");
+assert.equal(historical.brands.find(brand=>brand.brand==="Fonterra").lifecycleStatus,"STILL ACTIVE","a brand scheduled through the current date must not become dormant because another brand has later data");
 assert.equal(historical.brands.find(brand=>brand.brand==="A").activeFrom,"2026-08-04");
 assert(historical.executive.ytd.runRateGmv>0,"executive summary must expose a yearly run-rate");
 
