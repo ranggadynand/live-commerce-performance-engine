@@ -63,6 +63,9 @@ export type Metrics={
   views:number;
   viewsPerHour:number;
   impressions?:number;
+  productImpressions?:number;
+  productClicks?:number;
+  orders?:number;
   err?:number;
   avd?:number;
   engagementRate?:number;
