@@ -1,20 +1,17 @@
-# Live Commerce Performance Engine — V2
+# Live Commerce Performance Engine V2.1
 
-TikTok + Shopee Live control tower.
+Data-integrity + performance-complete release.
 
-## Included
-- Global period filter: Today, Yesterday, Last 7/30 Days, This/Last Week, This/Last Month, Custom.
-- Previous-equivalent-period comparison for the whole dashboard.
-- TikTok: ERR, AVD, Engagement, CTR, CO Rate, AOV, Show GPM, Watch GPM, GMV/H.
-- Shopee: AVD, Engagement, CTR, CO Rate, AOV, Watch GPM, GMV/H. No Show GPM.
-- Best / worst session.
-- Best / worst host using normalized quality score instead of raw GMV only.
-- Best time slot, day and campaign type.
-- Top growth / biggest decline.
-- Click any brand card to open full brand view with funnel, diagnosis, host ranking and session table.
-- Daily AE email automation: Result → Driver → Diagnosis → Action → Owner.
-
-## Keep existing Vercel variables
-GOOGLE_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, TIKTOK_SHEET_NAME, SHOPEE_SHEET_NAME.
-
-Optional email variables: RESEND_API_KEY, EMAIL_FROM, AE_ROUTING_JSON, CRON_SECRET.
+Key upgrades:
+- Separate TikTok and Shopee funnel engines.
+- Shopee uses Views/H, AVD, Views-to-CO, AOV, Watch GPM, GMV/H.
+- TikTok retains ERR, AVD, Engagement, CTR, CO Rate, AOV, Show GPM, Watch GPM, GMV/H.
+- Blank/missing values remain N/A instead of becoming zero.
+- Invalid host values such as #N/A are excluded from host ranking.
+- Result Status and Funnel Health are separated to avoid contradictory "GOOD" states.
+- Host scoring is platform-specific and re-normalizes weights when a metric is unavailable.
+- Session validity rule and host minimum-hours rule.
+- Asia/Jakarta period handling.
+- Data quality warnings.
+- Brand performance score, consistency, priority queue, and efficiency matrix.
+- Full brand drilldown remains available.

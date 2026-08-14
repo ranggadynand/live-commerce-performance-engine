@@ -1,6 +1,6 @@
 {
   "name": "live-commerce-performance-engine",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "googleapis": "^144.0.0",
-    "next": "15.2.8",
+    "next": "15.5.7",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "resend": "^4.1.2"
