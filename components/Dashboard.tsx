@@ -1,51 +1,13 @@
 "use client";
-import { useEffect,useMemo,useState } from "react";
-
-type Item=any;
-const money=(n:number)=>new Intl.NumberFormat("id-ID",{notation:"compact",maximumFractionDigits:1}).format(n||0);
-const pct=(n?:number)=>n==null?"—":`${(n*100).toFixed(1)}%`;
-const sec=(n?:number)=>n==null?"—":`${n.toFixed(1)}s`;
-
-export default function Dashboard(){
- const [payload,setPayload]=useState<any>(null);
- const [platform,setPlatform]=useState("All");
- const [brand,setBrand]=useState("All");
- useEffect(()=>{fetch("/api/dashboard").then(r=>r.json()).then(setPayload)},[]);
- const rows:Item[]=payload?.data||[];
- const brands=useMemo(()=>[...new Set(rows.map(x=>x.brand))],[rows]);
- const filtered=rows.filter(x=>(platform==="All"||x.platform===platform)&&(brand==="All"||x.brand===brand));
- const totals=filtered.reduce((a,x)=>({gmv:a.gmv+x.current.gmv,h:a.h+x.current.hours}),{gmv:0,h:0});
- return <main>
-   <header><div><span className="eyebrow">ORCA · PERFORMANCE ENGINE</span><h1>Live Commerce Control Tower</h1><p>Result → Driver → Diagnosis → Action → Owner</p></div>
-   <div className="source">{payload?.source==="google-sheet"?"LIVE · GOOGLE SHEET":"DEMO DATA · CONNECT GOOGLE SHEET"}</div></header>
-
-   <section className="filters">
-    <select value={platform} onChange={e=>setPlatform(e.target.value)}><option>All</option><option>TikTok</option><option>Shopee</option></select>
-    <select value={brand} onChange={e=>setBrand(e.target.value)}><option>All</option>{brands.map((b:any)=><option key={b}>{b}</option>)}</select>
-   </section>
-
-   <section className="hero">
-    <div><small>GMV</small><strong>Rp {money(totals.gmv)}</strong></div>
-    <div><small>LIVE HOURS</small><strong>{totals.h.toFixed(1)}</strong></div>
-    <div><small>BLENDED GMV/H</small><strong>Rp {money(totals.h?totals.gmv/totals.h:0)}</strong></div>
-    <div><small>ACCOUNTS</small><strong>{filtered.length}</strong></div>
-   </section>
-
-   <section className="grid">{filtered.map((x:any)=><article className="card" key={`${x.brand}-${x.platform}`}>
-     <div className="cardhead"><div><small>{x.platform}</small><h2>{x.brand}</h2></div><span className={`status ${x.diagnostic.status}`}>{x.diagnostic.status}</span></div>
-     <div className="gmvh"><span>GMV/H</span><b>Rp {money(x.current.gmvPerHour)}</b></div>
-     <div className="metrics">
-       {x.platform==="TikTok"&&<Metric k="ERR" v={pct(x.current.err)}/>}
-       <Metric k="AVD" v={sec(x.current.avd)}/>
-       <Metric k="Engagement" v={pct(x.current.engagementRate)}/>
-       <Metric k="CTR" v={pct(x.current.ctr)}/>
-       <Metric k="CO Rate" v={pct(x.current.coRate)}/>
-       <Metric k="AOV" v={`Rp ${money(x.current.aov)}`}/>
-       {x.platform==="TikTok"&&<Metric k="Show GPM" v={`Rp ${money(x.current.showGpm)}`}/>}
-       <Metric k="Watch GPM" v={`Rp ${money(x.current.watchGpm)}`}/>
-     </div>
-     <div className="diagnosis"><small>PRIMARY DRIVER</small><b>{x.diagnostic.primaryDriver}</b><p>{x.diagnostic.summary}</p><div className="action"><strong>Action:</strong> {x.diagnostic.actions[0]}</div></div>
-   </article>)}</section>
- </main>
-}
-function Metric({k,v}:{k:string,v:string}){return <div><span>{k}</span><b>{v}</b></div>}
+import {useEffect,useMemo,useState} from "react";
+const money=(n?:number)=>n==null?"—":"Rp "+new Intl.NumberFormat("id-ID",{notation:"compact",maximumFractionDigits:1}).format(n);const num=(n?:number)=>n==null?"—":new Intl.NumberFormat("id-ID",{notation:"compact",maximumFractionDigits:1}).format(n);const pct=(n?:number)=>n==null?"—":`${(n*100).toFixed(1)}%`;const sec=(n?:number)=>n==null?"—":`${n.toFixed(1)}s`;const delta=(n?:number)=>n==null?"—":`${n>=0?"▲":"▼"} ${Math.abs(n*100).toFixed(1)}%`;const dc=(n?:number)=>n==null?"":n>=0?"up":"down";const periods=[["last7","Last 7 Days"],["last30","Last 30 Days"],["thisWeek","This Week"],["lastWeek","Last Week"],["thisMonth","This Month"],["lastMonth","Last Month"],["today","Today"],["yesterday","Yesterday"],["custom","Custom"]];
+export default function Dashboard(){const[period,setPeriod]=useState("last7"),[platform,setPlatform]=useState("All"),[brand,setBrand]=useState("All"),[start,setStart]=useState(""),[end,setEnd]=useState(""),[data,setData]=useState<any>(null),[loading,setLoading]=useState(false),[openBrand,setOpenBrand]=useState<string|null>(null);const q=useMemo(()=>{const p=new URLSearchParams({period,platform,brand});if(period==="custom"&&start&&end){p.set("start",start);p.set("end",end)}return p.toString()},[period,platform,brand,start,end]);useEffect(()=>{if(period==="custom"&&(!start||!end))return;setLoading(true);fetch("/api/dashboard?"+q).then(r=>r.json()).then(setData).finally(()=>setLoading(false))},[q,period,start,end]);const brands=data?.brands?.map((x:any)=>x.brand)||[],s=data?.summary?.current;
+return <main><header><div><span className="eyebrow">ORCA · PERFORMANCE ENGINE</span><h1>Live Commerce Control Tower</h1><p>Result → Driver → Diagnosis → Action → Owner</p></div><div className={`source ${data?.source==="google-sheet"?"live":"error"}`}>{data?.source==="google-sheet"?"LIVE · GOOGLE SHEET":"DATA ERROR"}</div></header>
+<section className="toolbar"><select value={period} onChange={e=>setPeriod(e.target.value)}>{periods.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>{period==="custom"&&<><input type="date" value={start} onChange={e=>setStart(e.target.value)}/><span>→</span><input type="date" value={end} onChange={e=>setEnd(e.target.value)}/></>}<select value={platform} onChange={e=>setPlatform(e.target.value)}><option>All</option><option>TikTok</option><option>Shopee</option></select><select value={brand} onChange={e=>setBrand(e.target.value)}><option>All</option>{brands.map((b:string)=><option key={b}>{b}</option>)}</select><div className="range">{data?.range?`${data.range.start} → ${data.range.end}`:""}</div></section>
+{loading&&<div className="loading">Refreshing performance window…</div>}{data?.error&&<div className="errorbox">{data.error}</div>}
+<section className="hero"><K k="GMV" v={money(s?.gmv)} sub={delta(data?.summary?.gmvhDelta)+" GMV/H vs prev."} c={dc(data?.summary?.gmvhDelta)}/><K k="LIVE HOURS" v={s?.hours?.toFixed(1)??"—"} sub={`${s?.sessions??0} sessions`}/><K k="GMV / HOUR" v={money(s?.gmvPerHour)} sub={delta(data?.summary?.gmvhDelta)} c={dc(data?.summary?.gmvhDelta)}/><K k="VIEWS" v={num(s?.views)} sub={`${num(s?.viewsPerHour)} / hour`}/></section>
+<section className="highlights"><H title="Best Session" obj={data?.highlights?.bestSession} mode="session"/><H title="Worst Session" obj={data?.highlights?.worstSession} mode="session"/><H title="Best Host" obj={data?.highlights?.bestHost} mode="host"/><H title="Top Growth" obj={data?.highlights?.topGrowth} mode="growth"/></section>
+<div className="sectionTitle"><div><span className="eyebrow">ACCOUNT CONTROL</span><h2>Brand Performance</h2></div><span>{data?.brands?.length||0} brands</span></div><section className="brandGrid">{(data?.brands||[]).map((b:any)=><article className="brandCard" key={b.brand} onClick={()=>setOpenBrand(b.brand)}><div className="cardhead"><div><h3>{b.brand}</h3><small>{b.current.sessions} sessions · {b.current.hours.toFixed(1)}h</small></div><span className={`status ${b.status}`}>{b.status}</span></div><div className="brandGMV"><span>GMV/H</span><b>{money(b.current.gmvPerHour)}</b><em className={dc(b.gmvhDelta)}>{delta(b.gmvhDelta)}</em></div><div className="platformRows">{b.platforms.map((p:any)=><div key={p.platform}><strong>{p.platform}</strong><span>{money(p.current.gmvPerHour)}</span><i className={dc(p.delta.gmvh)}>{delta(p.delta.gmvh)}</i><small>{p.diagnostics.primaryDriver}</small></div>)}</div><button>Open full brand view →</button></article>)}</section>{openBrand&&<BrandModal brand={openBrand} period={period} start={start} end={end} onClose={()=>setOpenBrand(null)}/>}</main>}
+function K({k,v,sub,c}:{k:string,v:string,sub:string,c?:string}){return <div><small>{k}</small><strong>{v}</strong><span className={c}>{sub}</span></div>}function H({title,obj,mode}:{title:string,obj:any,mode:string}){if(!obj)return <div className="highlight"><small>{title}</small><b>—</b><span>No data</span></div>;if(mode==="host")return <div className="highlight"><small>{title}</small><b>{obj.name}</b><span>{obj.platform} · Score {obj.score}</span></div>;if(mode==="growth")return <div className="highlight"><small>{title}</small><b>{obj.brand}</b><span className={dc(obj.gmvhDelta)}>{delta(obj.gmvhDelta)} GMV/H</span></div>;return <div className="highlight"><small>{title}</small><b>{obj.brand}</b><span>{obj.platform} · {obj.date} · {obj.slot||"—"} · {money(obj.metrics?.gmvPerHour)}/H</span></div>}
+function BrandModal({brand,period,start,end,onClose}:{brand:string;period:string;start:string;end:string;onClose:()=>void}){const[d,setD]=useState<any>(null);useEffect(()=>{const p=new URLSearchParams({brand,period});if(period==="custom"&&start&&end){p.set("start",start);p.set("end",end)}fetch("/api/brand?"+p.toString()).then(r=>r.json()).then(setD)},[brand,period,start,end]);return <div className="modalBackdrop" onMouseDown={onClose}><div className="modal" onMouseDown={e=>e.stopPropagation()}><div className="modalHead"><div><span className="eyebrow">FULL BRAND VIEW</span><h2>{brand}</h2><p>{d?.range?`${d.range.start} → ${d.range.end}`:"Loading..."}</p></div><button onClick={onClose}>×</button></div>{!d&&<div className="loading">Loading brand intelligence…</div>}{(d?.platforms||[]).map((p:any)=><section className="platformDetail" key={p.platform}><div className="detailTitle"><div><h3>{p.platform}</h3><span className={`status ${p.diagnostics.status}`}>{p.diagnostics.status}</span></div><p>{p.diagnostics.summary}</p></div><div className="metricStrip">{p.platform==="TikTok"&&<M k="ERR" v={pct(p.current.err)}/>}<M k="AVD" v={sec(p.current.avd)}/><M k="Engagement" v={pct(p.current.engagementRate)}/><M k="CTR" v={pct(p.current.ctr)}/><M k="CO Rate" v={pct(p.current.coRate)}/><M k="AOV" v={money(p.current.aov)}/>{p.platform==="TikTok"&&<M k="Show GPM" v={money(p.current.showGpm)}/>}<M k="Watch GPM" v={money(p.current.watchGpm)}/></div><div className="detailGrid"><P title="Diagnosis & Action"><b>{p.diagnostics.primaryDriver}</b><p>{p.diagnostics.actions?.[0]}</p></P><P title="Best / Worst Session"><p><b>Best:</b> {p.bestSession?`${p.bestSession.date} · ${p.bestSession.slot||"—"} · ${money(p.bestSession.metrics.gmvPerHour)}/H`:"—"}</p><p><b>Worst:</b> {p.worstSession?`${p.worstSession.date} · ${p.worstSession.slot||"—"} · ${money(p.worstSession.metrics.gmvPerHour)}/H`:"—"}</p></P><P title="Best Time Slot"><p><b>{p.timeSlots?.[0]?.name||"—"}</b></p><span>{p.timeSlots?.[0]?money(p.timeSlots[0].metrics.gmvPerHour)+"/H":"No data"}</span></P><P title="Best Day / Campaign"><p><b>{p.days?.[0]?.name||"—"}</b> · {p.campaigns?.[0]?.name||"—"}</p></P></div><h4>Host Ranking</h4><div className="tableWrap"><table><thead><tr><th>#</th><th>Host</th><th>Score</th><th>Hours</th><th>GMV/H</th><th>AVD</th><th>CTR</th><th>CO Rate</th><th>Watch GPM</th></tr></thead><tbody>{(p.hosts||[]).slice(0,20).map((h:any,i:number)=><tr key={h.name}><td>{i+1}</td><td><b>{h.name}</b></td><td>{h.score}</td><td>{h.metrics.hours.toFixed(1)}</td><td>{money(h.metrics.gmvPerHour)}</td><td>{sec(h.metrics.avd)}</td><td>{pct(h.metrics.ctr)}</td><td>{pct(h.metrics.coRate)}</td><td>{money(h.metrics.watchGpm)}</td></tr>)}</tbody></table></div><h4>Session Detail</h4><div className="tableWrap"><table><thead><tr><th>Date</th><th>Slot</th><th>Host</th><th>Type</th><th>Hours</th><th>GMV</th><th>GMV/H</th><th>Views</th><th>AVD</th><th>CTR</th><th>CO Rate</th><th>AOV</th><th>Watch GPM</th></tr></thead><tbody>{(p.sessions||[]).map((s:any,i:number)=><tr key={(s.liveId||"s")+i}><td>{s.date}</td><td>{s.slot||"—"}</td><td>{s.host||"—"}</td><td>{s.campaignType||"—"}</td><td>{s.duration}</td><td>{money(s.gmv)}</td><td>{money(s.metrics.gmvPerHour)}</td><td>{num(s.views)}</td><td>{sec(s.avd)}</td><td>{pct(s.ctr)}</td><td>{pct(s.coRate)}</td><td>{money(s.aov)}</td><td>{money(s.metrics.watchGpm)}</td></tr>)}</tbody></table></div></section>)}</div></div>}
+function M({k,v}:{k:string;v:string}){return <div><span>{k}</span><b>{v}</b></div>}function P({title,children}:{title:string;children:React.ReactNode}){return <div className="panel"><small>{title}</small>{children}</div>}

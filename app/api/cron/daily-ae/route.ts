@@ -1,12 +1,1 @@
-import { NextRequest,NextResponse } from "next/server";
-import { loadAll } from "@/lib/sheets";
-import { routes,sendDaily } from "@/lib/email";
-
-export async function GET(req:NextRequest){
-  const secret=req.headers.get("authorization");
-  if(process.env.CRON_SECRET && secret!==`Bearer ${process.env.CRON_SECRET}`) return new NextResponse("Unauthorized",{status:401});
-  const rows=await loadAll();
-  const result=[];
-  for(const ae of routes()) result.push({ae:ae.email,result:await sendDaily(ae,rows)});
-  return NextResponse.json({ok:true,sent:result.length,result});
-}
+import {NextRequest,NextResponse} from "next/server";import {loadAll} from "@/lib/sheets";import {routes,sendDaily} from "@/lib/email";export async function GET(req:NextRequest){const s=req.headers.get("authorization");if(process.env.CRON_SECRET&&s!==`Bearer ${process.env.CRON_SECRET}`)return new NextResponse("Unauthorized",{status:401});const rows=await loadAll(),result=[];for(const ae of routes())result.push({ae:ae.email,result:await sendDaily(ae,rows)});return NextResponse.json({ok:true,sent:result.length,result})}

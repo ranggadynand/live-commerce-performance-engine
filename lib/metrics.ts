@@ -1,41 +1,4 @@
-import { LiveRow, Metrics } from "./types";
-
-const sum = (xs:number[]) => xs.reduce((a,b)=>a+(Number.isFinite(b)?b:0),0);
-const weighted = (rows:LiveRow[], key:keyof LiveRow, weight:keyof LiveRow) => {
-  let n=0,d=0;
-  for(const r of rows){
-    const v=Number(r[key]), w=Number(r[weight]);
-    if(Number.isFinite(v)&&Number.isFinite(w)&&w>0){n+=v*w;d+=w;}
-  }
-  return d ? n/d : undefined;
-};
-
-export function aggregate(rows:LiveRow[]):Metrics {
-  const hours=sum(rows.map(r=>r.duration));
-  const gmv=sum(rows.map(r=>r.gmv));
-  const views=sum(rows.map(r=>r.views));
-  const impressions=sum(rows.map(r=>r.impressions||0));
-  const clicks=sum(rows.map(r=>r.productClicks||0));
-  const productImpressions=sum(rows.map(r=>r.productImpressions||0));
-  const orders=sum(rows.map(r=>r.orders||0));
-  const aov = orders ? gmv/orders : weighted(rows,"aov","gmv");
-  const platform=rows[0]?.platform;
-
-  return {
-    hours, gmv, views,
-    gmvPerHour: hours ? gmv/hours : 0,
-    viewsPerHour: hours ? views/hours : 0,
-    impressions: platform==="TikTok" ? impressions : undefined,
-    err: platform==="TikTok" && impressions ? views/impressions : weighted(rows,"err","impressions"),
-    avd: weighted(rows,"avd","views"),
-    engagementRate: weighted(rows,"engagementRate","views"),
-    ctr: productImpressions ? clicks/productImpressions : weighted(rows,"ctr","views"),
-    coRate: clicks ? orders/clicks : weighted(rows,"coRate","views"),
-    aov,
-    showGpm: platform==="TikTok" && impressions ? gmv/impressions*1000 : undefined,
-    watchGpm: views ? gmv/views*1000 : undefined
-  };
-}
-
-export const pct = (current?:number, base?:number) =>
-  current!=null && base ? (current-base)/base : undefined;
+import {LiveRow,Metrics} from "./types"; const sum=(x:number[])=>x.reduce((a,b)=>a+(Number.isFinite(b)?b:0),0);
+function weighted(rows:LiveRow[],key:keyof LiveRow,weight:keyof LiveRow){let n=0,d=0;for(const r of rows){const v=Number(r[key]),w=Number(r[weight]);if(Number.isFinite(v)&&Number.isFinite(w)&&w>0){n+=v*w;d+=w}}return d?n/d:undefined}
+export function aggregate(rows:LiveRow[]):Metrics{const p=rows[0]?.platform,h=sum(rows.map(r=>r.duration)),gmv=sum(rows.map(r=>r.gmv)),views=sum(rows.map(r=>r.views)),imp=sum(rows.map(r=>r.impressions||0)),pi=sum(rows.map(r=>r.productImpressions||0)),clicks=sum(rows.map(r=>r.productClicks||0)),orders=sum(rows.map(r=>r.orders||0));return{sessions:rows.length,hours:h,gmv,gmvPerHour:h?gmv/h:0,views,viewsPerHour:h?views/h:0,impressions:p==="TikTok"?imp:undefined,err:p==="TikTok"?(imp?views/imp:weighted(rows,"err","views")):undefined,avd:weighted(rows,"avd","views"),engagementRate:weighted(rows,"engagementRate","views"),ctr:pi?clicks/pi:weighted(rows,"ctr","views"),coRate:clicks?orders/clicks:weighted(rows,"coRate","views"),aov:orders?gmv/orders:weighted(rows,"aov","gmv"),showGpm:p==="TikTok"&&imp?gmv/imp*1000:undefined,watchGpm:views?gmv/views*1000:undefined}}
+export const movement=(c?:number,b?:number)=>c!=null&&b!=null&&b!==0?(c-b)/b:undefined;
