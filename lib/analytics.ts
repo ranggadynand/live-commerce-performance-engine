@@ -71,7 +71,7 @@ export function analyzeBrand(all:LiveRow[],brand:string,range:DateRange,prev:Dat
   const current=all.filter(row=>row.brand===brand&&inRange(row.date,range)),previous=all.filter(row=>row.brand===brand&&inRange(row.date,prev));
   return{brand,platforms:platforms.map(platform=>analyzePlatform(current,previous,platform)).filter(item=>item.current.sessions>0||item.previous.sessions>0)};
 }
-export function analyzeDashboard(all:LiveRow[],range:DateRange,prev:DateRange,platformFilter?:string,brandFilter?:string){
+export function analyzeDashboard(all:LiveRow[],range:DateRange,prev:DateRange,platformFilter?:string,brandFilter?:string,asOf=isoDate(new Date())){
   const currentRange=all.filter(row=>inRange(row.date,range)),previousRange=all.filter(row=>inRange(row.date,prev));
   const filterPlatform=(row:LiveRow)=>row.brand&&(!platformFilter||platformFilter==="All"||row.platform===platformFilter);
   const availableBrands=[...new Set(currentRange.filter(filterPlatform).map(row=>row.brand))].sort();
@@ -80,7 +80,7 @@ export function analyzeDashboard(all:LiveRow[],range:DateRange,prev:DateRange,pl
   if(brandFilter&&brandFilter!=="All"){current=current.filter(row=>row.brand===brandFilter);previous=previous.filter(row=>row.brand===brandFilter)}
   current=current.filter(row=>!!row.brand);previous=previous.filter(row=>!!row.brand);
   const brands=[...new Set(current.map(row=>row.brand))].sort();
-  const dated=all.filter(row=>row.brand&&row.date),latestMonth=dated.map(row=>row.date!.slice(0,7)).sort().at(-1)||"";
+  const dated=all.filter(row=>row.brand&&row.date);
   const cards=brands.map(brand=>{
     const rows=current.filter(row=>row.brand===brand),baselineRows=previous.filter(row=>row.brand===brand);
     const platformResults=platforms.map(platform=>analyzePlatform(rows,baselineRows,platform)).filter(item=>item.current.sessions>0||item.previous.sessions>0);
@@ -88,7 +88,7 @@ export function analyzeDashboard(all:LiveRow[],range:DateRange,prev:DateRange,pl
     const warningCount=rows.reduce((total,row)=>total+(row.dataWarnings?.length||0),0),quality=rows.length?Math.max(0,Math.round(100-warningCount/rows.length*20)):0;
     const activityStatus=metrics.sessions===0&&baseline.sessions>0?"NO_LIVE":metrics.sessions>0?"ACTIVE":"NO_DATA";
     const health=healthFor(platformResults,quality,brandConsistency,gmvhDelta);
-    const brandDates=dated.filter(row=>row.brand===brand).map(row=>row.date!).sort(),activeFrom=brandDates[0],activeTo=brandDates.at(-1),lifecycleStatus=activeTo?.slice(0,7)===latestMonth?"STILL ACTIVE":"DORMANT";
+    const brandDates=dated.filter(row=>row.brand===brand).map(row=>row.date!).sort(),activeFrom=brandDates[0],activeTo=brandDates.at(-1),lifecycleStatus=activeTo&&activeTo>=asOf?"STILL ACTIVE":"DORMANT";
     return{brand,current:metrics,previous:baseline,gmvhDelta:activityStatus==="ACTIVE"?gmvhDelta:undefined,platforms:platformResults,status:health.status,activityStatus,performanceScore:health.score,consistency:brandConsistency,dataQualityScore:quality,activeFrom,activeTo,lifecycleStatus};
   }).sort((a,b)=>b.current.gmv-a.current.gmv);
   const comparable=cards.filter(card=>card.activityStatus==="ACTIVE"&&card.previous.sessions>0&&card.gmvhDelta!=null).sort((a,b)=>(b.gmvhDelta??0)-(a.gmvhDelta??0));
